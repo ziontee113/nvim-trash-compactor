@@ -52,17 +52,18 @@ local function get_them_lines(opts)
 		opts.old_cursor_pos = vim.api.nvim_win_get_cursor(0)
 	end
 	vim.api.nvim_buf_clear_namespace(0, ns, 0, -1) -- house cleaning
-
 	local first_line, last_line = vim.fn.line("w0") - 1, vim.fn.line("w$")
 	local lines_in_view = vim.api.nvim_buf_get_lines(0, first_line, last_line, false)
-
 	local blank_line_indexes = get_blank_lines_indexes(first_line, lines_in_view)
 	local hash_tbl = create_hash_table(blank_line_indexes)
 
 	--- add extmarks
 	for i, line in ipairs(blank_line_indexes) do
+		local label_and_spacing = string.rep(" ", (i - 1) * (opts.spaces or 0)) .. labels[i]
 		vim.api.nvim_buf_set_extmark(0, ns, line, 0, {
-			virt_text = { { labels[i], opts.hl_group or "CursorLine" } },
+			virt_text = {
+				{ label_and_spacing, opts.hl_group or "CursorLine" },
+			},
 			virt_text_pos = "overlay",
 		})
 	end
@@ -89,7 +90,12 @@ local function get_them_lines(opts)
 end
 
 vim.keymap.set("n", "<a-p>", function()
-	get_them_lines({ consecutive = true, hl_group = "STS_highlight" })
+	get_them_lines({
+		consecutive = true,
+		hl_group = "STS_highlight",
+		spaces = 7,
+	})
+	-- get_them_lines({ hl_group = "STS_highlight" })
 end, {})
 
 return M
