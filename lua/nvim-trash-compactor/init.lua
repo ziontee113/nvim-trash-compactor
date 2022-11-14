@@ -12,6 +12,8 @@ local labels = {
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ",", ";", "!",
 }
 
+local specials = { "u", "", "", "", "" }
+
 local function is_blank(line)
 	return not line:match("[%W%P]")
 end
@@ -38,18 +40,17 @@ local function getchar(hash_tbl)
 	local ok, keynum = pcall(vim.fn.getchar)
 	if ok then
 		local key = string.char(keynum)
-		if hash_tbl[key] then
+		if hash_tbl[key] or vim.tbl_contains(specials, key) then
 			return key
-		else
-			if string.char(keynum) == "u" then
-				return "u"
-			end
-			return false
 		end
 	end
+	return false
 end
 
-local function get_them_lines(consecutive)
+local function get_them_lines(opts)
+	if not opts.old_cursor_pos then
+		opts.old_cursor_pos = vim.api.nvim_win_get_cursor(0)
+	end
 	vim.api.nvim_buf_clear_namespace(0, ns, 0, -1) -- house cleaning
 
 	local first_line, last_line = vim.fn.line("w0") - 1, vim.fn.line("w$")
@@ -61,7 +62,7 @@ local function get_them_lines(consecutive)
 	--- add extmarks
 	for i, line in ipairs(blank_line_indexes) do
 		vim.api.nvim_buf_set_extmark(0, ns, line, 0, {
-			virt_text = { { labels[i], "STS_highlight" } },
+			virt_text = { { labels[i], opts.hl_group or "CursorLine" } },
 			virt_text_pos = "overlay",
 		})
 	end
@@ -70,23 +71,25 @@ local function get_them_lines(consecutive)
 	--- vim.fn.getchar
 	local getchar_result = getchar(hash_tbl)
 	if getchar_result then
-		if getchar_result == "u" then
-			vim.cmd("norm! u")
-		else
+		if hash_tbl[getchar_result] then
 			vim.api.nvim_win_set_cursor(0, { hash_tbl[getchar_result] + 1, 0 })
 			vim.cmd("norm! dd")
+		else
+			local command = "norm! " .. getchar_result
+			vim.cmd(command)
 		end
 
-		if consecutive then
-			get_them_lines(true)
+		if opts.consecutive then
+			get_them_lines(opts)
 		end
 	end
 
 	vim.api.nvim_buf_clear_namespace(0, ns, 0, -1)
+	vim.api.nvim_win_set_cursor(0, opts.old_cursor_pos)
 end
 
 vim.keymap.set("n", "<a-p>", function()
-	get_them_lines(true)
+	get_them_lines({ consecutive = true, hl_group = "STS_highlight" })
 end, {})
 
 return M
